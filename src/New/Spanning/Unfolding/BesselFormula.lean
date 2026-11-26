@@ -337,33 +337,6 @@ lemma prod_formalDegree_ne_zero (h : S.Fits V l kw Y η) :
   apply h.isIdempotentKernel.apply_one_ne_zero
   simpa only [h_zero, zero_mul, inv_mul_cancel, map_eq_zero] using h.conj_typeKernel 1 1
 
-/-- Suppose `V` with grading `Y` fits `S` (the hypothesis `h`). Let `g`, `y` be points of
-`GInf E ε = ∏_v U(diag ε)`, carried to `∏_v G₁` by `realHomeomorph`, and let `u v` be a vector of
-the value space `ℂ^I` of the Bessel system at `v`, on which `U(κ)` acts by `rep`. The local
-integrand `besselIntegrand l rep x u y` at `(r, a)` in the local Bessel group is
-`l.dsCoeffInFrame (x⁻¹ r y) • wave (-simpleRootSum r) • rep a⁻¹ u`. Let `s` be a real point of the
-Bessel group of `Y`; its components `besselRealToPi s v` are made with `realCoords`, and
-`realCoords s * realHomeomorph y = realHomeomorph (s * y)`. At these components the tensor product
-of the integrands, in coordinates `S.BesselCoord`, is the product of the coefficients at
-`(realHomeomorph g)⁻¹ * realHomeomorph (s * y)`, times the inverse of `besselChar` at `s`, times the
-tensor product of the `u v` moved by the Kronecker product `kroneckerPi` of the matrices `rep` of
-the inverse of the Levi part of `s`. -/
-lemma prod_besselIntegrand (h : S.Fits V l kw Y η) (g y : GInf E ε)
-    (u : ∀ v : InfinitePlace E, EuclideanSpace ℂ (S.besselSystem v).Index) (s : Y.besselReal) :
-    (fun i : S.BesselCoord ↦ ∏ v : InfinitePlace E,
-      besselIntegrand (l v) (S.besselSystem v).rep (h.realHomeomorph g v) (u v)
-        (h.realHomeomorph y v) (h.besselRealToPi s v) (i v)) =
-      (∏ v : InfinitePlace E,
-          (l v).dsCoeffInFrame ((h.realHomeomorph g v)⁻¹ * h.realHomeomorph (s * y) v)) •
-        (h.besselChar (s.val, 1))⁻¹ • (kroneckerPi fun v : InfinitePlace E ↦ ((S.besselSystem v).rep
-          (unitSignEquiv 𝔰.κ ((Y.leviPart ⟨(s.val, 1), s.property⟩).fst v))⁻¹).val) *ᵥ
-          fun i : S.BesselCoord ↦ ∏ v : InfinitePlace E, u v (i v) := by
-  ext i
-  simp only [Pi.smul_apply, besselChar_inl_inv, ← realCoords_mul_realHomeomorph,
-    kroneckerPi_mulVec_prod _ fun v ↦ (u v).ofLp, smul_eq_mul, ← Finset.prod_mul_distrib]
-  -- Factor by factor this is the definition of `besselIntegrand`.
-  rfl
-
 /-- **The Bessel function as one integral.** Let `E` be a CM field, fix a unitary matrix that
 carries the form of `G₁` to the diagonal form of signs `ε`, and suppose the hermitian space `V` with
 grading `Y` and central element `η` fits the filling data `S`; in particular the Bessel system of
@@ -407,8 +380,11 @@ theorem exists_besselFn_eq_integral (h : S.Fits V l kw Y η) :
       (fun i : S.BesselCoord ↦ ∏ v, f v (h.besselRealToPi s v) (i v)) =
         (∏ v, (l v).dsCoeffInFrame ((h.realHomeomorph g v)⁻¹ * h.realHomeomorph (s * y) v)) •
           (h.besselChar (s.val, 1))⁻¹ • (kroneckerPi fun v ↦ ((S.besselSystem v).rep
-            (unitSignEquiv 𝔰.κ ((Y.leviPart ⟨(s.val, 1), s.property⟩).1 v))⁻¹).val) *ᵥ w :=
-    h.prod_besselIntegrand g y u s
+            (unitSignEquiv 𝔰.κ ((Y.leviPart ⟨(s.val, 1), s.property⟩).1 v))⁻¹).val) *ᵥ w := by
+    ext i
+    simp only [f, w, Pi.smul_apply, besselChar_inl_inv, ← realCoords_mul_realHomeomorph,
+      kroneckerPi_mulVec_prod _ fun v ↦ (u v).ofLp, smul_eq_mul, ← Finset.prod_mul_distrib]
+    rfl
   have h_besselFn : S.besselFn .full (h.realHomeomorph y) = (∏ v, (a v : ℂ)) •
       fun i ↦ ∏ v, (∫ s, f v s ∂𝔰.besselGraphMeasure) (i v) := by
     simp [funext_iff, Filling.besselFn, f, h_eq, besselAverage, Finset.prod_mul_distrib]
