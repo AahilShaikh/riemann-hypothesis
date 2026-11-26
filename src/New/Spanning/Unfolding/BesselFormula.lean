@@ -376,6 +376,9 @@ theorem exists_besselFn_eq_integral (h : S.Fits V l kw Y η) :
   refine ⟨g, t, fun y ζ ↦ ?_⟩
   let f (v : InfinitePlace E) : 𝔰.besselGraph → EuclideanSpace ℂ (S.besselSystem v).Index :=
     besselIntegrand (l v) (S.besselSystem v).rep (h.realHomeomorph g v) (u v) (h.realHomeomorph y v)
+  -- The tensor product of the local integrands factors into the coefficient at
+  -- `(realHomeomorph g)⁻¹ * realHomeomorph (s * y)`, the inverse of `besselChar`, and the
+  -- Kronecker product of the Levi part acting on `w`.
   have h_prod (s : Y.besselReal) :
       (fun i : S.BesselCoord ↦ ∏ v, f v (h.besselRealToPi s v) (i v)) =
         (∏ v, (l v).dsCoeffInFrame ((h.realHomeomorph g v)⁻¹ * h.realHomeomorph (s * y) v)) •
@@ -384,6 +387,7 @@ theorem exists_besselFn_eq_integral (h : S.Fits V l kw Y η) :
     ext i
     simp only [f, w, Pi.smul_apply, besselChar_inl_inv, ← realCoords_mul_realHomeomorph,
       kroneckerPi_mulVec_prod _ fun v ↦ (u v).ofLp, smul_eq_mul, ← Finset.prod_mul_distrib]
+    -- Factor by factor this is the definition of `besselIntegrand`.
     rfl
   have h_besselFn : S.besselFn .full (h.realHomeomorph y) = (∏ v, (a v : ℂ)) •
       fun i ↦ ∏ v, (∫ s, f v s ∂𝔰.besselGraphMeasure) (i v) := by
