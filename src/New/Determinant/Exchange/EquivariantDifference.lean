@@ -100,26 +100,6 @@ lemma ReadsAt.pairWeil_localDatum_of_mem_supportedOn {F : Type} [SemilocalField 
     (hΨ := hπ.isSchwartzBruhat hφ) hg hh]
   simp
 
-/-- Let `𝔠` be a split tame character: a character `ν = 𝔠.character` of the norm-one ideles, tamely
-ramified exactly at a finite set `S = 𝔠.ramifiedPlaces` of places disjoint from its conjugate. Let
-`rk W` be even and let `k ∈ U(V)` be finite (`Gf`), supported at `S` and its conjugate, with
-component `k_S` at `S`. Consider the datum `localDatum W V v Φ 𝔠.readsAt`: `v` at the infinite
-places, the function `Φ` at `S` and the vacuum elsewhere. It lies in the Weil representation
-`pairWeil` of `(W, V)` with both characters `ν⁻¹ υ ^ ⌊rk W / 2⌋` (`rankTwist`), `υ` being the
-splitting character of the Weil data. Then `k⁻¹` moves it to the same datum with `x ↦ Φ (k_S * x)`
-in place of `Φ`, times the value at `det k_S` of `t ↦ ν (t / t̄) |t| ^ (rk W / 2)` (`localChar`).
-Here `Φ` is Schwartz–Bruhat on the matrices `x` of full row rank. -/
-lemma pairWeil_inv_localDatum (hn : 2 ∣ card n) (v : PairFock E s t)
-    {Φ : Matrix a n (LocProd 𝔠.ramifiedPlaces) → ℂ} (hΦ : Φ ∈ schwartzBruhat {x | HasLeftInv xᵀ})
-    {k : Gf E a} (hk : k ∈ Gf.supportedOn a 𝔠.ramifiedPlaces) :
-    pairWeil W V (rankTwist 𝔠.character⁻¹ n) (rankTwist 𝔠.character⁻¹ n) ((1, 1), 1, k⁻¹)
-        (localDatum W V v Φ 𝔠.readsAt) =
-      localChar 𝔠.ramifiedPlaces 𝔠.character.baseChange (card n)
-        (atPlaces 𝔠.ramifiedPlaces k).val.det •
-        localDatum W V v (fun x ↦ Φ ((atPlaces 𝔠.ramifiedPlaces k).val * x)) 𝔠.readsAt := by
-  rw [𝔠.readsAt.pairWeil_localDatum_of_mem_supportedOn W V _ _ v hΦ (one_mem _) (inv_mem hk)]
-  simp [spaceChar_rankTwist hn, atPlaces_star]
-
 /-- Let `𝔠` be a split tame character, with character `ν` of the norm-one ideles and finite set `S`
 of ramified places. Let `rk W = card b + rk V` (`σ`) be even, and let `χ` be the character
 `t ↦ ν (t / t̄) |t| ^ (rk W / 2)` at `S` (`localChar`). Let `(Φ, Ψ)` be a same-section pair for `χ`
@@ -264,8 +244,10 @@ lemma exists_linear_thetaLarge (σ : b ⊕ a ≃ n) (hn : 2 ∣ card n) {v : Pai
     have h_move : pairWeil W V ρ ρ ((1, 1), 1, k⁻¹) (D Φ) =
         localChar 𝔠.ramifiedPlaces 𝔠.character.baseChange (card n)
           (atPlaces 𝔠.ramifiedPlaces k).val.det •
-          D fun x ↦ Φ ((atPlaces 𝔠.ramifiedPlaces k).val * x) :=
-            pairWeil_inv_localDatum W V 𝔠 hn v hΦ hk
+          D fun x ↦ Φ ((atPlaces 𝔠.ramifiedPlaces k).val * x) := by
+      rw [IsLinearMap.mk'_apply,
+        𝔠.readsAt.pairWeil_localDatum_of_mem_supportedOn W V _ _ v hΦ (one_mem _) (inv_mem hk)]
+      simp [ρ, D, spaceChar_rankTwist hn, atPlaces_star]
     ext x
     rw [← map_smul, ← h_move, hΛ h_bdd, Prod.mk_one_one,
       hΛ (h_bdd.pairWeil_one_left ρ ρ (1, k⁻¹)), thetaIntegral_pairWeil, mul_one]
