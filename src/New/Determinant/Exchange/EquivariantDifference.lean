@@ -241,6 +241,8 @@ lemma exists_linear_thetaLarge (σ : b ⊕ a ≃ n) (hn : 2 ∣ card n) {v : Pai
         (D fun x ↦ Φ (g.val * x)) = Λ (D Φ) := by
     obtain ⟨k, hk, rfl⟩ := 𝔠.exists_atPlaces_eq g
     have h_bdd : IsTargetBounded W V (D Φ) := 𝔠.readsAt.isTargetBounded hv hΦ
+    -- `k⁻¹`, supported at `S`, replaces `Φ` by `x ↦ Φ (k_S * x)` and scales by `localChar` at
+    -- `det k_S`.
     have h_move : pairWeil W V ρ ρ ((1, 1), 1, k⁻¹) (D Φ) =
         localChar 𝔠.ramifiedPlaces 𝔠.character.baseChange (card n)
           (atPlaces 𝔠.ramifiedPlaces k).val.det •
