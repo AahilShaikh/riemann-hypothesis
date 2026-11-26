@@ -167,14 +167,7 @@ private lemma signMatrix_mul_conjTranspose_mul_apply (A : Matrix n n ℂ) (i j :
 private lemma lowerLiePart_zero_eq (Z : Matrix n n ℂ) :
     lowerLiePart ε ε' o 0 Z =
       lowerMask ε' o Z - signMatrix ε * (lowerMask ε' o Z)ᴴ * signMatrix ε := by
-  rw [lowerLiePart, mul_apply_eq_comp, sub_apply, one_apply_eq_self, mul_apply_eq_comp,
-    mulLeftRight_apply]
-  have hN : (lowerMask ε' o + (0 : ℂ) • entryMask Eq).restrictScalars ℝ Z = lowerMask ε' o Z := by
-    change lowerMask ε' o Z + (0 : ℂ) • entryMask Eq Z = lowerMask ε' o Z
-    rw [zero_smul, add_zero]
-  rw [hN]
-  change lowerMask ε' o Z - signMatrix ε * starL' ℝ (lowerMask ε' o Z) * signMatrix ε = _
-  rw [starL'_apply, star_eq_conjTranspose]
+  simp [lowerLiePart, star_eq_conjTranspose]
 
 /-- A chart at `1` adapted to the triangular matrices. Let `E` send `0` to `1` with strict
 derivative the identity. Let `L` be real linear, with every `E (L Z)` block diagonal for `ε`, and
@@ -194,43 +187,31 @@ theorem exists_borel_chart (L : Matrix n n ℂ →L[ℝ] Matrix n n ℂ) {E : Ma
         IsBorelMatrix o b ∧ (a ∈ blockDiagAlg ε ∧ b ∈ blockDiagAlg ε) ∧ y = a * b := by
   -- `ψ` is the local inverse of `f`, which maps `0` to `1` with derivative `L + (1 - L) = id`.
   let f (x : Matrix n n ℂ) : Matrix n n ℂ := E (L x) * (1 + (1 - L) x)
-  have f_zero : f 0 = 1 := by dsimp only [f]; rw [map_zero, E_zero, map_zero, add_zero, mul_one]
+  have f_zero : f 0 = 1 := by simp [f, E_zero]
   have f_deriv : HasStrictFDerivAt f
       (ContinuousLinearEquiv.refl ℝ (Matrix n n ℂ)).toContinuousLinearMap 0 := by
-    have first : HasStrictFDerivAt (fun x ↦ E (L x)) (.comp (.id ℝ (Matrix n n ℂ)) L) 0 :=
-      .comp 0 (by rw [map_zero]; exact E_deriv) L.hasStrictFDerivAt
-    refine (first.mul' (.const_add 1 (1 - L).hasStrictFDerivAt)).congr_fderiv
-      (ContinuousLinearMap.ext fun Z ↦ ?_)
-    rw [add_apply, smul_apply, smul_apply, map_zero, E_zero, map_zero, add_zero, smul_eq_mul,
-      Matrix.one_mul, MulOpposite.op_one, one_smul, sub_apply, one_apply_eq_self,
-      ContinuousLinearMap.comp_apply, ContinuousLinearMap.id_apply, sub_add_cancel]
-    rfl
+    refine ((HasStrictFDerivAt.comp 0 (by simpa using E_deriv) L.hasStrictFDerivAt).mul'
+      (.const_add 1 (1 - L).hasStrictFDerivAt)).congr_fderiv (ext fun Z ↦ by simp [E_zero])
   let ψ : Matrix n n ℂ → Matrix n n ℂ := f_deriv.localInverse f _ 0
-  have ψ_one : ψ 1 = 0 := by rw [← f_zero]; exact f_deriv.localInverse_apply_image
-  have ψ_deriv : HasFDerivAt ψ (ContinuousLinearMap.id ℝ (Matrix n n ℂ)) 1 := by
-    rw [← f_zero]; exact f_deriv.to_localInverse.hasFDerivAt
-  have right_inverse : ∀ᶠ y : Matrix n n ℂ in 𝓝 1, f (ψ y) = y := by
-    rw [← f_zero]; exact f_deriv.eventually_right_inverse
-  refine ⟨ψ, ⟨ψ_deriv, ψ_one⟩, ?_⟩
+  have right_inverse : ∀ᶠ y : Matrix n n ℂ in 𝓝 1, f (ψ y) = y :=
+    f_zero ▸ f_deriv.eventually_right_inverse
+  refine ⟨ψ, ⟨f_zero ▸ f_deriv.to_localInverse.hasFDerivAt,
+    f_zero ▸ f_deriv.localInverse_apply_image⟩, ?_⟩
   -- Near `1`, `y = f x` is invertible, hence so are both factors.
   filter_upwards [right_inverse, Units.nhds 1] with y
   generalize ψ y = x
   rintro rfl h_unit h_mem
   obtain ⟨det_a, det_b⟩ : (E (L x)).det ≠ 0 ∧ (1 + (1 - L) x).det ≠ 0 := by
-    have h_det := (isUnit_iff_isUnit_det _).1 h_unit
-    rwa [det_mul, isUnit_iff_ne_zero, mul_ne_zero_iff] at h_det
+    simpa [f, isUnit_iff_isUnit_det, isUnit_iff_ne_zero] using h_unit
   have b_mem : 1 + (1 - L) x ∈ blockDiagAlg ε := by
-    have h_mul := mul_mem (blockDiagAlg.inv_mem (hL_mem x)) h_mem
-    rwa [← Matrix.mul_assoc, nonsing_inv_mul _ (isUnit_iff_ne_zero.2 det_a), Matrix.one_mul]
-      at h_mul
+    simpa [f, ← Matrix.mul_assoc, nonsing_inv_mul _ (isUnit_iff_ne_zero.2 det_a)] using
+      mul_mem (blockDiagAlg.inv_mem (hL_mem x)) h_mem
   refine ⟨⟨fun i j hij ↦ ?_, det_b⟩, ⟨hL_mem x, b_mem⟩, rfl⟩
   -- Below the diagonal, `x - L x` vanishes inside the blocks by `hL_lower` and outside by `b_mem`.
   by_cases h_sign : ε i = ε j
-  · have h_ne : i ≠ j := fun h_eq ↦ hij.ne (congrArg o h_eq.symm)
-    have h_eq := congr_fun₂ (hL_lower x).symm i j
+  · have h_eq := congr_fun₂ (hL_lower x).symm i j
     simp only [lowerMask_apply, hij, h_sign, and_self, ↓reduceIte] at h_eq
-    rw [Matrix.add_apply, Matrix.one_apply_ne h_ne, zero_add, sub_apply, one_apply_eq_self,
-      Matrix.sub_apply, h_eq, sub_self]
+    simp [Matrix.one_apply_ne (show i ≠ j by grind), h_eq]
   · exact mem_blockDiagAlg.1 b_mem i j h_sign
 
 variable {ε ε' : n → ℤˣ} {o : n → ℤ} {M X : Type*} [AddCommGroup M] [Module ℂ M]
@@ -397,30 +378,19 @@ theorem IsBorelMatrix.exists_eq_diagonal_exp (ho : o.Injective) {t : USign ε}
   -- The inverse of `t` is triangular and equals `signMatrix * tᴴ * signMatrix`: so `t` vanishes on
   -- both sides of the diagonal, and the diagonal entries have norm one.
   have norm_one (i : n) : ‖(t : Matrix n n ℂ) i i‖ = 1 := by
-    have norm_inv : ‖(t : Matrix n n ℂ) i i‖⁻¹ = ‖(t : Matrix n n ℂ) i i‖ := by
+    have h_inv : ‖(t : Matrix n n ℂ) i i‖⁻¹ = ‖(t : Matrix n n ℂ) i i‖ := by
       rw [← _root_.norm_inv, ← ht.inv_apply_diag ho i, inv_coe_eq_mul_conjTranspose_mul t,
-        signMatrix_mul_conjTranspose_mul_apply, norm_mul, norm_mul, Complex.norm_intCast,
-        abs_unit_intCast, Complex.norm_conj, one_mul, mul_one]
+        signMatrix_mul_conjTranspose_mul_apply]
+      simp [abs_unit_intCast]
     have h_ne : ‖(t : Matrix n n ℂ) i i‖ ≠ 0 := norm_ne_zero_iff.2 (ht.diag_ne_zero ho i)
-    have h_mul : ‖(t : Matrix n n ℂ) i i‖ * ‖(t : Matrix n n ℂ) i i‖ = 1 :=
-      (congrArg (‖(t : Matrix n n ℂ) i i‖ * ·) norm_inv.symm).trans (mul_inv_cancel₀ h_ne)
-    exact (mul_self_eq_one_iff.1 h_mul).resolve_right
-      (ne_of_gt (lt_of_lt_of_le (neg_lt_zero.2 one_pos) (norm_nonneg _)))
+    nlinarith [mul_inv_cancel₀ h_ne, norm_nonneg ((t : Matrix n n ℂ) i i)]
   refine ⟨fun i ↦ arg ((t : Matrix n n ℂ) i i), ext fun i j ↦ ?_⟩
   obtain rfl | hij := eq_or_ne i j
-  · rw [diagonal_apply_eq]
-    have h := norm_mul_exp_arg_mul_I ((t : Matrix n n ℂ) i i)
-    rw [norm_one i, Complex.ofReal_one, one_mul] at h
-    exact h.symm
+  · simpa [norm_one i] using (norm_mul_exp_arg_mul_I ((t : Matrix n n ℂ) i i)).symm
   · rw [diagonal_apply_ne _ hij]
     obtain h_lt | h_gt := (ho.ne hij).lt_or_gt
-    · have h0 := ht.inv.1 h_lt
-      rw [inv_coe_eq_mul_conjTranspose_mul t, signMatrix_mul_conjTranspose_mul_apply] at h0
-      have h_ne_j : ((ε j : ℤ) : ℂ) ≠ 0 := Int.cast_ne_zero.2 (Units.ne_zero (ε j))
-      have h_ne_i : ((ε i : ℤ) : ℂ) ≠ 0 := Int.cast_ne_zero.2 (Units.ne_zero (ε i))
-      have h_conj : conj ((t : Matrix n n ℂ) i j) = 0 :=
-        (mul_eq_zero.1 ((mul_eq_zero.1 h0).resolve_right h_ne_i)).resolve_left h_ne_j
-      exact (map_eq_zero (starRingEnd ℂ)).1 h_conj
+    · simpa [inv_coe_eq_mul_conjTranspose_mul t, signMatrix_mul_conjTranspose_mul_apply,
+        Units.ne_zero] using ht.inv.1 h_lt
     · exact ht.1 h_gt
 
 /-- Let `x` be a highest vector of weight `u` in the `gl n`-module `ρ` for the blocks of `ε'` and
@@ -461,44 +431,24 @@ theorem HCParam.IsKHighest.coef_mul_triangular (ho : o.Injective) {ρ : GlModule
     ⟨diagonal fun a ↦ θ a * I, by
       change (diagonal fun a ↦ (θ a : ℂ) * I)ᴴ * signMatrix ε +
         signMatrix ε * (diagonal fun a ↦ (θ a : ℂ) * I) = 0
-      ext i j
-      rw [Matrix.add_apply, Matrix.zero_apply, signMatrix, mul_diagonal, diagonal_mul,
-        conjTranspose_apply, star_def]
-      obtain rfl | hij := eq_or_ne i j
-      · rw [diagonal_apply_eq, map_mul, conj_ofReal, conj_I, mul_neg, neg_mul, mul_comm,
-          neg_add_cancel]
-      · rw [diagonal_apply_ne _ hij.symm, diagonal_apply_ne _ hij, map_zero, zero_mul, mul_zero,
-          add_zero]⟩
+      ext i j; simp [signMatrix, diagonal_apply]; split_ifs <;> simp [mul_comm]⟩
   have exp_Y : expU Y = t := Subtype.ext (Units.ext (by
     change NormedSpace.exp (diagonal fun a ↦ (θ a : ℂ) * I) = (t : Matrix n n ℂ)
     rw [hθ, exp_diagonal, Pi.exp_def, exp_eq_exp_ℂ]))
   let lam : ℂ := ∑ a : n, u a * (θ a * I)
   have act_Y : ρ Y x = lam • x := by
-    rw [hx.apply_triangular ho Y (diagonal_mem_blockDiagAlg _) (blockTriangular_diagonal _)]
-    congr 1
-    exact Finset.sum_congr rfl fun a _ ↦ by dsimp only [Y]; rw [diagonal_apply_eq]
+    simpa [Y, lam] using
+      hx.apply_triangular ho Y (diagonal_mem_blockDiagAlg _) (blockTriangular_diagonal _)
   -- Along `expU (s • Y)` the coefficient grows by the weight `lam` of `Y`; the factor `cexp` undoes
   -- it, so `f` is constant.
   let f (s : ℝ) : X := cexp ((1 - s) * lam) • c (h * expU (s • Y)) x
   have deriv_zero (s : ℝ) : HasDerivAt f 0 s := by
-    have factor : HasDerivAt (fun s : ℝ ↦ cexp ((1 - s) * lam)) (cexp ((1 - s) * lam) * -lam) s :=
-      ((hasDerivAt_mul_const lam).comp_const_sub 1 (s : ℂ)).cexp.comp_ofReal
-    refine (factor.smul (hc h Y x s)).congr_deriv ?_
-    rw [act_Y, map_smul, smul_smul, ← add_smul, mul_neg, mul_comm (cexp _) lam, add_neg_cancel,
-      zero_smul]
+    refine ((((hasDerivAt_mul_const lam).comp_const_sub 1 (s : ℂ)).cexp.comp_ofReal).smul
+      (hc h Y x s)).congr_deriv ?_
+    simp [act_Y, smul_smul, mul_comm (cexp _) lam]
   have f_const : f 1 = f 0 := is_const_of_deriv_eq_zero
     (fun s ↦ (deriv_zero s).differentiableAt) (fun s ↦ (deriv_zero s).deriv) 1 0
-  have hf1 : f 1 = c (h * t) x := by
-    dsimp only [f]
-    rw [Complex.ofReal_one, sub_self, zero_mul, Complex.exp_zero, one_smul, one_smul, exp_Y]
-  have hf0 : f 0 = diagChar u t • c h x := by
-    dsimp only [f]
-    rw [Complex.ofReal_zero, sub_zero, one_mul, zero_smul, expU_zero, mul_one, diagChar]
-    congr 1
-    rw [exp_sum]
-    exact Finset.prod_congr rfl fun a _ ↦ by
-      rw [Complex.exp_intCast_mul, hθ, diagonal_apply_eq]
-  rw [← hf1, ← hf0, f_const]
+  simpa [f, exp_Y, diagChar, lam, exp_sum, Complex.exp_intCast_mul, hθ] using f_const
 
 /-- Under the hypotheses of `New.HCParam.IsKHighest.coef_mul_triangular` (`x` highest of weight
 `u`, `c` a coefficient map), the vector `diagChar u b • c h x` depends only on the product `h * b`
@@ -544,25 +494,14 @@ lemma HCParam.IsKHighest.apply_lowerLiePart_zero (ho : o.Injective) {ρ : GlModu
     {u : n → ℤ} {x : M} (hx : (toHCParam ε' (-o)).IsKHighest ρ u x) (Y : Matrix n n ℂ) :
     ρ (lowerLiePart ε ε' o 0 Y) x = ρ (lowerMask ε' o Y) x := by
   let U : Matrix n n ℂ := signMatrix ε * (lowerMask ε' o Y)ᴴ * signMatrix ε
-  have eq_lower_sub : lowerLiePart ε ε' o 0 Y = lowerMask ε' o Y - U :=
-    lowerLiePart_zero_eq ε ε' o Y
-  have U_block : U ∈ blockDiagAlg ε' :=
-    mem_blockDiagAlg.2 fun i j hij ↦ by
-      dsimp only [U]
-      rw [signMatrix_mul_conjTranspose_mul_apply, lowerMask_apply]
-      simp only [hij.symm, and_false, ↓reduceIte, map_zero, mul_zero, zero_mul]
+  have U_block : U ∈ blockDiagAlg ε' := mem_blockDiagAlg.2 fun i j hij ↦ by
+    simp [U, signMatrix_mul_conjTranspose_mul_apply, hij.symm]
   have U_tri : U.BlockTriangular o := fun i j hij ↦ by
-    dsimp only [U]
-    rw [signMatrix_mul_conjTranspose_mul_apply, lowerMask_apply]
-    simp only [hij.not_gt, false_and, ↓reduceIte, map_zero, mul_zero, zero_mul]
-  have U_diag (a : n) : U a a = 0 := by
-    dsimp only [U]
-    rw [signMatrix_mul_conjTranspose_mul_apply, lowerMask_apply]
-    simp only [lt_irrefl, false_and, ↓reduceIte, map_zero, mul_zero, zero_mul]
+    simp [U, signMatrix_mul_conjTranspose_mul_apply, hij.not_gt]
   have U_apply : ρ U x = 0 := by
     rw [hx.apply_triangular ho U U_block U_tri]
-    simp only [U_diag, mul_zero, sum_const_zero, zero_smul]
-  rw [eq_lower_sub, map_sub, LinearMap.sub_apply, U_apply, sub_zero]
+    simp [U, signMatrix_mul_conjTranspose_mul_apply]
+  rw [lowerLiePart_zero_eq, map_sub, LinearMap.sub_apply, U_apply, sub_zero]
 
 /-- The matrices `lowerLiePart ε ε' o 0 Z` and `Z` have the same entries below the diagonal for `o`
 inside the blocks of `ε'`. -/
@@ -660,20 +599,14 @@ theorem HCParam.IsKHighest.isHolOfWeight_coeffMap (ho : o.Injective) {ρ : Φ �
       obtain ⟨tri_borel, ⟨exp_mem, tri_mem⟩, shift_eq⟩ := hy' (blockDiagPart_mem _)
       refine ⟨tri_borel, tri_borel.mul hb, ⟨mul_mem h_mem exp_mem, mul_mem tri_mem b_mem⟩, ?_⟩
       have h_mul := congrArg (fun z : Matrix n n ℂ ↦ (h : Matrix n n ℂ) * z * b) shift_eq
-      change (h : Matrix n n ℂ) * blockDiagPart ε' ((h : Matrix n n ℂ)⁻¹ * y' * b⁻¹) * b =
-        (h : Matrix n n ℂ) *
-          (NormedSpace.exp (v (ψ (shift y'))) * tri (ψ (shift y'))) * b at h_mul
+      change (h : Matrix n n ℂ) * blockDiagPart ε' ((h : Matrix n n ℂ)⁻¹ * y' * b⁻¹) * b = _
+        at h_mul
       rw [blockDiagPart_mul_right (blockDiagAlg.inv_mem b_mem),
         blockDiagPart_mul_left (blockDiagAlg.inv_mem h_mem),
         ← Matrix.mul_assoc (h : Matrix n n ℂ), ← Matrix.mul_assoc (h : Matrix n n ℂ),
         mul_nonsing_inv _ h_det, Matrix.one_mul, Matrix.mul_assoc, nonsing_inv_mul _ b_det,
         Matrix.mul_one] at h_mul
-      rw [h_mul]
-      dsimp only [unit]
-      rw [Subgroup.coe_mul, Units.val_mul]
-      change (h : Matrix n n ℂ) * (NormedSpace.exp (v (ψ (shift y'))) * tri (ψ (shift y'))) * b =
-        (h : Matrix n n ℂ) * NormedSpace.exp (v (ψ (shift y'))) * (tri (ψ (shift y')) * b)
-      rw [Matrix.mul_assoc, Matrix.mul_assoc, Matrix.mul_assoc]
+      simpa [unit, tri, Matrix.mul_assoc] using h_mul
     refine ⟨?_, factor.mono fun y' hy' ↦ Set.nonempty_of_mem hy'.2⟩
     let inChart (Z : Matrix n n ℂ) : X :=
       (diagChar (u τ) (1 + Z) * diagChar (u τ) b) • c τ (unit Z) (x τ)
@@ -683,24 +616,16 @@ theorem HCParam.IsKHighest.isHolOfWeight_coeffMap (ho : o.Injective) {ρ : Φ �
       rw [ψ_one]
       have h_entry (i : n) : AnalyticAt ℂ (fun Z : Matrix n n ℂ ↦ (1 + Z) i i) 0 :=
         analyticAt_const.add
-          ((ContinuousLinearMap.mk
-            ({ toFun Z := Z i i
-               map_add' _ _ := rfl
-               map_smul' _ _ := rfl } : Matrix n n ℂ →ₗ[ℂ] ℂ)
-            ((continuous_apply i).comp (continuous_apply i))).analyticAt 0)
+          (((LinearMap.proj i ∘ₗ LinearMap.proj i :
+            Matrix n n ℂ →ₗ[ℂ] ℂ).toContinuousLinearMap).analyticAt 0)
       have h_char : DifferentiableAt ℂ
           (fun Z : Matrix n n ℂ ↦ diagChar (u τ) (1 + Z) * diagChar (u τ) b) 0 :=
-        ((Finset.analyticAt_fun_prod univ fun i _ ↦
-          (h_entry i).zpow (by rw [add_zero, Matrix.one_apply_eq]; exact one_ne_zero)).mul
-            analyticAt_const).differentiableAt
+        ((Finset.analyticAt_fun_prod univ fun i _ ↦ (h_entry i).zpow (by simp)).mul
+          analyticAt_const).differentiableAt
       exact .smul h_char ((hx τ).differentiableAt_coeffMap_expU ho (hc τ) (hc_cont τ) h)
     -- Near `y` we have `extend τ = inChart ∘ ψ ∘ shift`, because `v Z` has zero diagonal.
     have tri_diag (Z : Matrix n n ℂ) (i : n) : tri Z i i = (1 + Z) i i := by
-      dsimp only [tri, v]
-      rw [Matrix.add_apply, Matrix.add_apply, sub_apply, one_apply_eq_self, Matrix.sub_apply,
-        lowerLiePart_zero_eq, Matrix.sub_apply, signMatrix_mul_conjTranspose_mul_apply,
-        lowerMask_apply]
-      simp only [lt_irrefl, false_and, ↓reduceIte, map_zero, mul_zero, zero_mul, sub_zero]
+      simp [tri, v, lowerLiePart_zero_eq, signMatrix_mul_conjTranspose_mul_apply]
     refine (comp_diff.comp y shift.differentiableAt).congr_of_eventuallyEq (factor.mono ?_)
     rintro y' ⟨tri_borel, h_factor⟩
     change extend τ y' = inChart (ψ (shift y'))
@@ -946,49 +871,29 @@ theorem IsHolOfWeight.circle_mean_weightMinors (ho : o.Injective) {u : Φ → n 
   let rhs (t : ℝ) : ℂ := q 0 * (∏ τ, weightMinors (u τ) (c τ t)) * F 1
   suffices h_path : lhs = rhs by
     simpa only [lhs, rhs, weight, on_path, c_one] using congrFun h_path 1
-  have h_circ : Continuous fun θ : UnitAddCircle ↦ (θ.toCircle : ℂ) :=
-    continuous_subtypeVal.comp AddCircle.continuous_toCircle
   have h_pow (k : ℤ) : Continuous fun θ : UnitAddCircle ↦ (θ.toCircle : ℂ) ^ k :=
-    continuous_iff_continuousAt.2 fun θ ↦
-      h_circ.continuousAt.zpow₀ k (Or.inl (Circle.coe_ne_zero _))
+    (continuous_subtypeVal.comp AddCircle.continuous_toCircle).zpow₀ k fun _ ↦
+      Or.inl (Circle.coe_ne_zero _)
   have h_d : Continuous fun θ : UnitAddCircle ↦ d θ.toCircle :=
-    continuous_matrix fun i j ↦ by
-      by_cases hij : i = j
-      · subst hij
-        simpa only [d, diagonal_apply_eq] using h_pow (o i)
-      · simpa only [d, diagonal_apply_ne _ hij] using continuous_const
-  have h_prod_cont {ι : Type} (s : Finset ι) {f : ι → UnitAddCircle → ℂ}
-      (hf : ∀ i ∈ s, Continuous (f i)) : Continuous fun θ ↦ ∏ i ∈ s, f i θ :=
-    (Finset.prod_induction f (fun g : UnitAddCircle → ℂ ↦ Continuous g)
-      (fun _ _ ha hb ↦ ha.mul hb) continuous_const hf).congr fun θ ↦ Finset.prod_apply θ s f
+    continuous_matrix fun i j ↦ by by_cases hij : i = j <;> simp [d, hij, h_pow]; fun_prop
+  have h_term (τ : Φ) (i : n) :
+      Continuous fun θ : UnitAddCircle ↦ ((θ.toCircle : ℂ) ^ o i) ^ u τ i :=
+    (h_pow (o i)).zpow₀ (u τ i) fun _ ↦ Or.inl (zpow_ne_zero _ (Circle.coe_ne_zero _))
   have h_prod : Continuous fun θ : UnitAddCircle ↦
-      ∏ τ : Φ, ∏ i : n, ((θ.toCircle : ℂ) ^ o i) ^ u τ i :=
-    h_prod_cont univ fun τ _ ↦ h_prod_cont univ fun i _ ↦
-      continuous_iff_continuousAt.2 fun θ ↦
-        (h_pow (o i)).continuousAt.zpow₀ (u τ i) (Or.inl (zpow_ne_zero _ (Circle.coe_ne_zero _)))
+      ∏ τ : Φ, ∏ i : n, ((θ.toCircle : ℂ) ^ o i) ^ u τ i := by fun_prop
   have h_weight : Continuous fun θ : UnitAddCircle ↦ weight θ.toCircle :=
-    (h_prod.inv₀ fun θ ↦ Finset.prod_ne_zero_iff.2 fun τ _ ↦
-      Finset.prod_ne_zero_iff.2 fun i _ ↦
-        zpow_ne_zero _ (zpow_ne_zero _ (Circle.coe_ne_zero _))).mul
-      (continuous_iff_continuousAt.2 fun θ ↦
-        (hq _ (by rw [mem_closedBall_zero_iff, Circle.norm_coe])).continuousAt.comp
-          h_circ.continuousAt)
+    (h_prod.inv₀ fun _ ↦ by simp [Circle.coe_ne_zero, prod_ne_zero_iff, zpow_ne_zero]).mul
+      (hq.continuousOn.comp_continuous (continuous_subtypeVal.comp AddCircle.continuous_toCircle)
+        fun _ ↦ by simp)
   let ι (θ : UnitAddCircle) : (Φ → Matrix n n ℂ) × ℂ := (fun _ ↦ d θ.toCircle, weight θ.toCircle)
   have hι : Continuous ι := (continuous_pi fun _ ↦ h_d).prodMk h_weight
-  let pA : (Φ → Matrix n n ℂ) × ((Φ → Matrix n n ℂ) × ℂ) →L[ℂ] (Φ → Matrix n n ℂ) :=
-    ContinuousLinearMap.fst ℂ (Φ → Matrix n n ℂ) ((Φ → Matrix n n ℂ) × ℂ)
-  let pB : (Φ → Matrix n n ℂ) × ((Φ → Matrix n n ℂ) × ℂ) →L[ℂ] (Φ → Matrix n n ℂ) :=
-    (ContinuousLinearMap.fst ℂ (Φ → Matrix n n ℂ) ℂ).comp
-      (ContinuousLinearMap.snd ℂ (Φ → Matrix n n ℂ) ((Φ → Matrix n n ℂ) × ℂ))
-  let pW : (Φ → Matrix n n ℂ) × ((Φ → Matrix n n ℂ) × ℂ) →L[ℂ] ℂ :=
-    (ContinuousLinearMap.snd ℂ (Φ → Matrix n n ℂ) ℂ).comp
-      (ContinuousLinearMap.snd ℂ (Φ → Matrix n n ℂ) ((Φ → Matrix n n ℂ) × ℂ))
   have lhs_analytic : AnalyticOnNhd ℝ lhs .univ := fun t _ ↦ by
     -- the integrand is analytic in the point, uniformly in `θ`, which enters through `ι θ`
     have h_fam := IsAnalyticFamily.of_analyticAt (p := fun τ ↦ (c τ t : Matrix n n ℂ)) hι
       (fun p ↦ F' (p.2.1 * p.1) * p.2.2) fun θ ↦
-        ((on_path θ.toCircle t).1.comp ((pB.analyticAt _).mul (pA.analyticAt _))).mul
-          (pW.analyticAt _)
+        ((on_path θ.toCircle t).1.comp
+          ((analyticAt_fst.comp analyticAt_snd).mul analyticAt_fst)).mul
+          (analyticAt_snd.comp analyticAt_snd)
     exact (h_fam.analyticAt_integral volume).restrictScalars.comp_of_eq
       (.pi fun τ ↦ c_analytic τ t) rfl
   have rhs_analytic : AnalyticOnNhd ℝ rhs .univ := fun t _ ↦
@@ -1040,36 +945,24 @@ theorem IsHolOfWeight.integral_mul_conj_weightMinors {F : (Unit → USign ε) �
     -- translating `k` multiplies `conj (weightMinors w k)` by the inverse character
     have conj_translate (θ : UnitAddCircle) : conj (weightMinors w (T θ * k).val) =
         (∏ i : n, ((θ.toCircle : ℂ) ^ o i) ^ w i)⁻¹ * conj (weightMinors w k.val) := by
-      have h_mul : weightMinors w ((T θ * k).val : Matrix n n ℂ) =
-          (∏ i : n, ((θ.toCircle : ℂ) ^ o i) ^ w i) * weightMinors w k.val :=
-        weightMinors_diagonal_mul (GeneralLinearGroup.det_ne_zero k.1.1)
-          fun i ↦ zpow_ne_zero _ (Circle.coe_ne_zero _)
+      have h_mul := weightMinors_diagonal_mul (w := w) (x := (k.val : Matrix n n ℂ))
+        (d := fun i ↦ (θ.toCircle : ℂ) ^ o i)
+        (GeneralLinearGroup.det_ne_zero k.1.1) fun i ↦ zpow_ne_zero _ (Circle.coe_ne_zero _)
       have h_conj : conj (θ.toCircle : ℂ) = (θ.toCircle : ℂ)⁻¹ :=
-        eq_inv_of_mul_eq_one_left (by
-          rw [Complex.conj_mul', Circle.norm_coe, Complex.ofReal_one, one_pow])
-      rw [h_mul, map_mul, map_prod, ← prod_inv_distrib]
-      congr 1
-      refine Finset.prod_congr rfl fun i _ ↦ ?_
-      rw [map_zpow₀, map_zpow₀, h_conj, _root_.inv_zpow, _root_.inv_zpow]
-    have k_mem : (k.val : Matrix n n ℂ) ∈ blockDiagAlg ε := mem_maxCompactU.1 k.property
+        (RCLike.inv_eq_conj (Circle.norm_coe θ.toCircle)).symm
+      simpa [T, diagTorusK, diagTorus, h_conj, ← prod_inv_distrib, map_zpow₀] using
+        congrArg conj h_mul
     simp only [conj_translate]
-    have h_coe (θ : UnitAddCircle) :
-        (↑(T θ * k) : USign ε) = diagTorus ε (fun i ↦ θ.toCircle ^ o i) * k.val :=
-      Subgroup.coe_mul (maxCompactU ε) (T θ) k
-    simp only [h_coe]
-    have h_cm := hF.circle_mean_weightMinors ho (g := fun _ ↦ k) (hε := .inr rfl)
-      (hu := fun _ ↦ hw) (hg := fun _ ↦ k_mem) (q := fun _ ↦ conj (weightMinors w k.val))
-      (hq := analyticOnNhd_const)
-    simpa only [Fintype.prod_unique] using h_cm
+    simpa only [Subgroup.coe_mul, Fintype.prod_unique] using
+      hF.circle_mean_weightMinors ho (g := fun _ ↦ k) (.inr rfl) (fun _ ↦ hw)
+        (fun _ ↦ mem_maxCompactU.1 k.property) (fun _ ↦ conj (weightMinors w k.val))
+        analyticOnNhd_const
   have hT_cont : Continuous T :=
     (continuous_diagTorus.comp (continuous_pi fun i ↦
       (continuous_zpow (o i)).comp AddCircle.continuous_toCircle)).subtype_mk _
   have h_int_cont : Continuous fun k : maxCompactU ε ↦
-      F (fun _ : Unit ↦ k) * conj (weightMinors w k) :=
-    (F_cont.comp (continuous_pi fun _ ↦ continuous_subtypeVal)).mul
-      (Complex.continuous_conj.comp (DiscreteSeries.continuous_weightMinors
-        (continuous_U_iff_matrix.1 continuous_subtypeVal)
-        fun k ↦ GeneralLinearGroup.det_ne_zero k.1.1))
+      F (fun _ : Unit ↦ k) * conj (weightMinors w k) := by
+    fun_prop (disch := simp [GeneralLinearGroup.det_ne_zero])
   refine (integral_eq_of_circle_mean (T := fun θ k ↦ T θ * k)
     ((hT_cont.comp continuous_fst).mul continuous_snd).measurable
     (fun θ ↦ measurePreserving_mul_left _ (T θ))
